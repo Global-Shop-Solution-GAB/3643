@@ -1,0 +1,171 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Variable.Global.iBIRUNID.Declare(Long,0)
+
+Variable.UDT.uInv.Define("BIRUNID",Long,BIRUNID)
+Variable.UDT.uInv.Define("Part",String,Part)
+Variable.UDT.uInv.Define("Lot",String,Lot)
+Variable.UDT.uInv.Define("Bin",String,Bin)
+Variable.UDT.uInv.Define("Heat",String,Heat)
+Variable.UDT.uInv.Define("Serial",String,Serial)
+Variable.UDT.uInv.Define("Phys_Count",Float,Phys_Count)
+Variable.UDT.uInv.Define("GSS_Qty",Float,GSS_Qty)
+Variable.UDT.uInv.Define("Unit_Cost",Float,Unit_Cost)
+Variable.uGlobal.uInv.Declare("uInv")
+Variable.Global.iLogID.Declare(Long,0)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+F.Intrinsic.Control.CallSub(Populate_table)
+F.Intrinsic.Control.CallSub(Callbi)
+F.Intrinsic.Control.CallSub(Unload)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3643_Inv_Var_Report.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(Unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+F.Intrinsic.Control.SetErrorHandler("Unload_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Unload_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3643_Inv_Var_Report.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Unload.End
+
+Program.Sub.Populate_Table.Start
+F.Intrinsic.Control.SetErrorHandler("Populate_Table_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.iCount.Declare(Long,0)
+V.Local.fQtyVar.Declare(Float)
+V.Local.fExtCost.Declare(Float)
+
+V.uGlobal.uInv.Redim(-1,-1)
+
+F.Global.BI.GetRunID(V.Global.iBIRUNID)
+F.Global.BI.StartLogging(V.Global.iBIRUNID,-1,-1,"",V.Global.iLogID)
+
+F.ODBC.Connection!con.OpenLocalRecordsetRO("rst","SELECT I.PART,I.LOT,I.BIN,I.HEAT,I.SERIAL_NUMBER,I.QUANTITY,I.UNIT_COST,Q.QTY FROM V_ITEM_MASTER I, V_INV_PHYS_VAR Q WHERE I.PART = Q.PART AND I.LOCATION = Q.LOCATION AND I.LOT = Q.LOT AND I.BIN = Q.BIN AND I.HEAT = Q.HEAT AND I.SERIAL_NUMBER = Q.SERIAL")
+
+F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,<>,True)
+	F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,True)
+		F.Intrinsic.Control.If(V.Local.iCount,=,0)
+			V.uGlobal.uInv.Redim(0,0)
+		F.Intrinsic.Control.Else
+			V.uGlobal.uInv.RedimPreserve(0,V.Local.iCount)
+		F.Intrinsic.Control.EndIf
+		
+		'Load Data to UDT
+		V.uGlobal.uInv(V.Local.iCount)!BIRUNID.Set(V.Global.iBIRUNID)
+		V.uGlobal.uInv(V.Local.iCount)!PART.Set(V.ODBC.con!rst.FieldValTrim!PART)
+		V.uGlobal.uInv(V.Local.iCount)!LOT.Set(V.ODBC.con!rst.FieldValTrim!LOT)
+		V.uGlobal.uInv(V.Local.iCount)!BIN.Set(V.ODBC.con!rst.FieldValTrim!BIN)
+		V.uGlobal.uInv(V.Local.iCount)!HEAT.Set(V.ODBC.con!rst.FieldValTrim!HEAT)
+		V.uGlobal.uInv(V.Local.iCount)!SERIAL.Set(V.ODBC.con!rst.FieldValTrim!SERIAL_NUMBER)
+		V.uGlobal.uInv(V.Local.iCount)!GSS_QTY.Set(V.ODBC.con!rst.FieldValTrim!QUANTITY)
+		V.uGlobal.uInv(V.Local.iCount)!PHYS_COUNT.Set(V.ODBC.con!rst.FieldValTrim!QTY)
+		V.uGlobal.uInv(V.Local.iCount)!Unit_Cost.Set(V.ODBC.con!rst.FieldValTrim!UNIT_COST)
+		'update counter
+		F.Intrinsic.Math.Add(V.Local.iCount,1,V.Local.iCount)
+		F.ODBC.con!rst.MoveNext
+	F.Intrinsic.Control.Loop
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Con!rst.Close
+
+'If there are records, save them to the Custom Table
+F.Intrinsic.Control.If(V.uGlobal.uInv.UBound,<>,-1)
+	F.ODBC.Connection!con.OpenLocalRecordsetRW("rst","SELECT * FROM GCG_3643_INV_VAR_REP")
+	F.Intrinsic.Variable.SaveUDTToRecordSet("con","rst","V.uGlobal.uInv")
+	F.ODBC.con!rst.Close
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Populate_Table_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3643_Inv_Var_Report.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Populate_Table.End
+
+Program.Sub.CallBI.Start
+F.Intrinsic.Control.SetErrorHandler("CallBI_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.iRet.Declare(Long)
+
+F.Global.BI.StopLogging(V.Global.iLogID)
+F.Global.BI.RunReportPreProcessor(V.Global.iBIRUNID,V.Global.iLogID,"","","",-1,True,"",-1,"",-1,"","",V.Local.iRet)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("CallBI_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3643_Inv_Var_Report.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.CallBI.End
+
+Program.Sub.Comments.Start
+${$0$}$Custom Inventory Variance Reportq$}$BCC$}$3/16/2016 10:37:11 AM
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$A custom report will be created that will show the Inventory Variance by Part.
+
+The report will be grouped by part,lot,bin,heat, and serial information.
+
+Report will be in Landscape orientation and show the following columns:
+
+Part
+
+Lot
+
+Bin
+
+Heat
+
+Serial
+
+Phys Count
+
+GSS Qty
+
+Qty Var
+
+Ext Cost
+
+At the end of the report a grand total of the Ext Cost field will be shown
+
+The report will be printed by a GAB script, ran from a custom menu item.
+
+The GAB script will format the data into a table that will be displayed on the report.
+Program.Sub.Comments.End
+
